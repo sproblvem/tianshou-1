@@ -21,20 +21,25 @@ class A2CPolicy(PGPolicy):
     :param float ent_coef: weight for entropy loss, defaults to 0.01.
     :param float max_grad_norm: clipping gradients in back propagation,
         defaults to ``None``.
+
+    .. seealso::
+
+        Please refer to :class:`~tianshou.policy.BasePolicy` for more detailed
+        explanation.
     """
 
     def __init__(self, actor, critic, optim,
                  dist_fn=torch.distributions.Categorical,
                  discount_factor=0.99, vf_coef=.5, ent_coef=.01,
                  max_grad_norm=None, **kwargs):
-        super().__init__(None, optim, dist_fn, discount_factor)
+        super().__init__(None, optim, dist_fn, discount_factor, **kwargs)
         self.actor = actor
         self.critic = critic
         self._w_vf = vf_coef
         self._w_ent = ent_coef
         self._grad_norm = max_grad_norm
 
-    def __call__(self, batch, state=None, **kwargs):
+    def forward(self, batch, state=None, **kwargs):
         """Compute action over the given batch data.
 
         :return: A :class:`~tianshou.data.Batch` which has 4 keys:
@@ -44,8 +49,10 @@ class A2CPolicy(PGPolicy):
             * ``dist`` the action distribution.
             * ``state`` the hidden state.
 
-        More information can be found at
-        :meth:`~tianshou.policy.BasePolicy.__call__`.
+        .. seealso::
+
+            Please refer to :meth:`~tianshou.policy.BasePolicy.forward` for
+            more detailed explanation.
         """
         logits, h = self.actor(batch.obs, state=state, info=batch.info)
         if isinstance(logits, tuple):

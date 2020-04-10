@@ -37,6 +37,11 @@ class TD3Policy(DDPGPolicy):
         defaults to ``False``.
     :param bool ignore_done: ignore the done flag while training the policy,
         defaults to ``False``.
+
+    .. seealso::
+
+        Please refer to :class:`~tianshou.policy.BasePolicy` for more detailed
+        explanation.
     """
 
     def __init__(self, actor, actor_optim, critic1, critic1_optim,
@@ -46,7 +51,7 @@ class TD3Policy(DDPGPolicy):
                  reward_normalization=False, ignore_done=False, **kwargs):
         super().__init__(actor, actor_optim, None, None, tau, gamma,
                          exploration_noise, action_range, reward_normalization,
-                         ignore_done)
+                         ignore_done, **kwargs)
         self.critic1, self.critic1_old = critic1, deepcopy(critic1)
         self.critic1_old.eval()
         self.critic1_optim = critic1_optim

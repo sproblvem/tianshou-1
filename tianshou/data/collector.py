@@ -2,10 +2,10 @@ import time
 import torch
 import warnings
 import numpy as np
-from tianshou.env import BaseVectorEnv
-from tianshou.data import Batch, ReplayBuffer, \
-    ListReplayBuffer
+
 from tianshou.utils import MovAvg
+from tianshou.env import BaseVectorEnv
+from tianshou.data import Batch, ReplayBuffer, ListReplayBuffer
 
 
 class Collector(object):
@@ -22,8 +22,6 @@ class Collector(object):
         :class:`~tianshou.data.ReplayBuffer`.
     :param int stat_size: for the moving average of recording speed, defaults
         to 100.
-    :param bool store_obs_next: whether to store the obs_next to replay
-        buffer, defaults to ``True``.
 
     Example:
     ::
@@ -70,8 +68,7 @@ class Collector(object):
         Please make sure the given environment has a time limitation.
     """
 
-    def __init__(self, policy, env, buffer=None, stat_size=100,
-                 store_obs_next=True, **kwargs):
+    def __init__(self, policy, env, buffer=None, stat_size=100, **kwargs):
         super().__init__()
         self.env = env
         self.env_num = 1
@@ -106,7 +103,6 @@ class Collector(object):
         self.state = None
         self.step_speed = MovAvg(stat_size)
         self.episode_speed = MovAvg(stat_size)
-        self._save_s_ = store_obs_next
 
     def reset_buffer(self):
         """Reset the main data buffer."""
@@ -150,12 +146,30 @@ class Collector(object):
             self.env.close()
 
     def _make_batch(self, data):
+        """Return [data]."""
         if isinstance(data, np.ndarray):
             return data[None]
         else:
             return np.array([data])
 
-    def collect(self, n_step=0, n_episode=0, render=0):
+    def _reset_state(self, id):
+        """Reset self.state[id]."""
+        if self.state is None:
+            return
+        if isinstance(self.state, list):
+            self.state[id] = None
+        elif isinstance(self.state, dict):
+            for k in self.state:
+                if isinstance(self.state[k], list):
+                    self.state[k][id] = None
+                elif isinstance(self.state[k], torch.Tensor) or \
+                        isinstance(self.state[k], np.ndarray):
+                    self.state[k][id] = 0
+        elif isinstance(self.state, torch.Tensor) or \
+                isinstance(self.state, np.ndarray):
+            self.state[id] = 0
+
+    def collect(self, n_step=0, n_episode=0, render=None):
         """Collect a specified number of step or episode.
 
         :param int n_step: how many steps you want to collect.
@@ -163,7 +177,7 @@ class Collector(object):
             environment).
         :type n_episode: int or list
         :param float render: the sleep time between rendering consecutive
-            frames. No rendering if it is ``0`` (default option).
+            frames, defaults to ``None`` (no rendering).
 
         .. note::
 
@@ -218,9 +232,10 @@ class Collector(object):
                 self._act = result.act
             obs_next, self._rew, self._done, self._info = self.env.step(
                 self._act if self._multi_env else self._act[0])
-            if render > 0:
+            if render is not None:
                 self.env.render()
-                time.sleep(render)
+                if render > 0:
+                    time.sleep(render)
             self.length += 1
             self.reward += self._rew
             if self._multi_env:
@@ -228,8 +243,7 @@ class Collector(object):
                     data = {
                         'obs': self._obs[i], 'act': self._act[i],
                         'rew': self._rew[i], 'done': self._done[i],
-                        'obs_next': obs_next[i] if self._save_s_ else None,
-                        'info': self._info[i]}
+                        'obs_next': obs_next[i], 'info': self._info[i]}
                     if self._cached_buf:
                         warning_count += 1
                         self._cached_buf[i].add(**data)
@@ -253,16 +267,7 @@ class Collector(object):
                         self.reward[i], self.length[i] = 0, 0
                         if self._cached_buf:
                             self._cached_buf[i].reset()
-                        if isinstance(self.state, list):
-                            self.state[i] = None
-                        elif self.state is not None:
-                            if isinstance(self.state[i], dict):
-                                self.state[i] = {}
-                            else:
-                                self.state[i] = self.state[i] * 0
-                            if isinstance(self.state, torch.Tensor):
-                                # remove ref count in pytorch (?)
-                                self.state = self.state.detach()
+                        self._reset_state(i)
                 if sum(self._done):
                     obs_next = self.env.reset(np.where(self._done)[0])
                 if n_episode != 0:
@@ -274,8 +279,7 @@ class Collector(object):
             else:
                 self.buffer.add(
                     self._obs, self._act[0], self._rew,
-                    self._done, obs_next if self._save_s_ else None,
-                    self._info)
+                    self._done, obs_next, self._info)
                 cur_step += 1
                 if self._done:
                     cur_episode += 1
@@ -292,7 +296,7 @@ class Collector(object):
         self._obs = obs_next
         if self._multi_env:
             cur_episode = sum(cur_episode)
-        duration = time.time() - start_time
+        duration = max(time.time() - start_time, 1e-9)
         self.step_speed.add(cur_step / duration)
         self.episode_speed.add(cur_episode / duration)
         self.collect_step += cur_step

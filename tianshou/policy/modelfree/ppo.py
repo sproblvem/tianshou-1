@@ -26,6 +26,11 @@ class PPOPolicy(PGPolicy):
     :param float ent_coef: weight for entropy loss, defaults to 0.01.
     :param action_range: the action range (minimum, maximum).
     :type action_range: [float, float]
+
+    .. seealso::
+
+        Please refer to :class:`~tianshou.policy.BasePolicy` for more detailed
+        explanation.
     """
 
     def __init__(self, actor, critic, optim, dist_fn,
@@ -36,7 +41,7 @@ class PPOPolicy(PGPolicy):
                  ent_coef=.0,
                  action_range=None,
                  **kwargs):
-        super().__init__(None, None, dist_fn, discount_factor)
+        super().__init__(None, None, dist_fn, discount_factor, **kwargs)
         self._max_grad_norm = max_grad_norm
         self._eps_clip = eps_clip
         self._w_vf = vf_coef
@@ -60,7 +65,7 @@ class PPOPolicy(PGPolicy):
         self.actor.eval()
         self.critic.eval()
 
-    def __call__(self, batch, state=None, model='actor', **kwargs):
+    def forward(self, batch, state=None, model='actor', **kwargs):
         """Compute action over the given batch data.
 
         :return: A :class:`~tianshou.data.Batch` which has 4 keys:
@@ -70,8 +75,10 @@ class PPOPolicy(PGPolicy):
             * ``dist`` the action distribution.
             * ``state`` the hidden state.
 
-        More information can be found at
-        :meth:`~tianshou.policy.BasePolicy.__call__`.
+        .. seealso::
+
+            Please refer to :meth:`~tianshou.policy.BasePolicy.forward` for
+            more detailed explanation.
         """
         model = getattr(self, model)
         logits, h = model(batch.obs, state=state, info=batch.info)

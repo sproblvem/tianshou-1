@@ -13,11 +13,16 @@ class PGPolicy(BasePolicy):
     :param torch.optim.Optimizer optim: a torch.optim for optimizing the model.
     :param torch.distributions.Distribution dist_fn: for computing the action.
     :param float discount_factor: in [0, 1].
+
+    .. seealso::
+
+        Please refer to :class:`~tianshou.policy.BasePolicy` for more detailed
+        explanation.
     """
 
     def __init__(self, model, optim, dist_fn=torch.distributions.Categorical,
                  discount_factor=0.99, **kwargs):
-        super().__init__()
+        super().__init__(**kwargs)
         self.model = model
         self.optim = optim
         self.dist_fn = dist_fn
@@ -38,7 +43,7 @@ class PGPolicy(BasePolicy):
         # batch.returns = self._vectorized_returns(batch)
         return batch
 
-    def __call__(self, batch, state=None, **kwargs):
+    def forward(self, batch, state=None, **kwargs):
         """Compute action over the given batch data.
 
         :return: A :class:`~tianshou.data.Batch` which has 4 keys:
@@ -48,8 +53,10 @@ class PGPolicy(BasePolicy):
             * ``dist`` the action distribution.
             * ``state`` the hidden state.
 
-        More information can be found at
-        :meth:`~tianshou.policy.BasePolicy.__call__`.
+        .. seealso::
+
+            Please refer to :meth:`~tianshou.policy.BasePolicy.forward` for
+            more detailed explanation.
         """
         logits, h = self.model(batch.obs, state=state, info=batch.info)
         if isinstance(logits, tuple):

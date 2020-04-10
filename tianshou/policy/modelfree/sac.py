@@ -33,6 +33,11 @@ class SACPolicy(DDPGPolicy):
         defaults to ``False``.
     :param bool ignore_done: ignore the done flag while training the policy,
         defaults to ``False``.
+
+    .. seealso::
+
+        Please refer to :class:`~tianshou.policy.BasePolicy` for more detailed
+        explanation.
     """
 
     def __init__(self, actor, actor_optim, critic1, critic1_optim,
@@ -40,7 +45,8 @@ class SACPolicy(DDPGPolicy):
                  alpha=0.2, action_range=None, reward_normalization=False,
                  ignore_done=False, **kwargs):
         super().__init__(None, None, None, None, tau, gamma, 0,
-                         action_range, reward_normalization, ignore_done)
+                         action_range, reward_normalization, ignore_done,
+                         **kwargs)
         self.actor, self.actor_optim = actor, actor_optim
         self.critic1, self.critic1_old = critic1, deepcopy(critic1)
         self.critic1_old.eval()
@@ -71,7 +77,7 @@ class SACPolicy(DDPGPolicy):
                 self.critic2_old.parameters(), self.critic2.parameters()):
             o.data.copy_(o.data * (1 - self._tau) + n.data * self._tau)
 
-    def __call__(self, batch, state=None, input='obs', **kwargs):
+    def forward(self, batch, state=None, input='obs', **kwargs):
         obs = getattr(batch, input)
         logits, h = self.actor(obs, state=state, info=batch.info)
         assert isinstance(logits, tuple)

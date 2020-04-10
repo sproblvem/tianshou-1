@@ -28,13 +28,18 @@ class DDPGPolicy(BasePolicy):
         defaults to ``False``.
     :param bool ignore_done: ignore the done flag while training the policy,
         defaults to ``False``.
+
+    .. seealso::
+
+        Please refer to :class:`~tianshou.policy.BasePolicy` for more detailed
+        explanation.
     """
 
     def __init__(self, actor, actor_optim, critic, critic_optim,
                  tau=0.005, gamma=0.99, exploration_noise=0.1,
                  action_range=None, reward_normalization=False,
                  ignore_done=False, **kwargs):
-        super().__init__()
+        super().__init__(**kwargs)
         if actor is not None:
             self.actor, self.actor_old = actor, deepcopy(actor)
             self.actor_old.eval()
@@ -93,8 +98,8 @@ class DDPGPolicy(BasePolicy):
             batch.done = batch.done * 0.
         return batch
 
-    def __call__(self, batch, state=None,
-                 model='actor', input='obs', eps=None, **kwargs):
+    def forward(self, batch, state=None,
+                model='actor', input='obs', eps=None, **kwargs):
         """Compute action over the given batch data.
 
         :param float eps: in [0, 1], for exploration use.
@@ -104,8 +109,10 @@ class DDPGPolicy(BasePolicy):
             * ``act`` the action.
             * ``state`` the hidden state.
 
-        More information can be found at
-        :meth:`~tianshou.policy.BasePolicy.__call__`.
+        .. seealso::
+
+            Please refer to :meth:`~tianshou.policy.BasePolicy.forward` for
+            more detailed explanation.
         """
         model = getattr(self, model)
         obs = getattr(batch, input)

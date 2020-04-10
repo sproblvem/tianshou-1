@@ -18,11 +18,16 @@ class DQNPolicy(BasePolicy):
         ahead.
     :param int target_update_freq: the target network update frequency (``0``
         if you do not use the target network).
+
+    .. seealso::
+
+        Please refer to :class:`~tianshou.policy.BasePolicy` for more detailed
+        explanation.
     """
 
     def __init__(self, model, optim, discount_factor=0.99,
                  estimation_step=1, target_update_freq=0, **kwargs):
-        super().__init__()
+        super().__init__(**kwargs)
         self.model = model
         self.optim = optim
         self.eps = 0
@@ -76,16 +81,17 @@ class DQNPolicy(BasePolicy):
             returns[buffer.done[now] > 0] = 0
             returns = buffer.rew[now] + self._gamma * returns
         terminal = (indice + self._n_step - 1) % len(buffer)
+        terminal_data = buffer[terminal]
         if self._target:
             # target_Q = Q_old(s_, argmax(Q_new(s_, *)))
-            a = self(buffer[terminal], input='obs_next', eps=0).act
+            a = self(terminal_data, input='obs_next', eps=0).act
             target_q = self(
-                buffer[terminal], model='model_old', input='obs_next').logits
+                terminal_data, model='model_old', input='obs_next').logits
             if isinstance(target_q, torch.Tensor):
                 target_q = target_q.detach().cpu().numpy()
             target_q = target_q[np.arange(len(a)), a]
         else:
-            target_q = self(buffer[terminal], input='obs_next').logits
+            target_q = self(terminal_data, input='obs_next').logits
             if isinstance(target_q, torch.Tensor):
                 target_q = target_q.detach().cpu().numpy()
             target_q = target_q.max(axis=1)
@@ -94,8 +100,8 @@ class DQNPolicy(BasePolicy):
         batch.returns = returns
         return batch
 
-    def __call__(self, batch, state=None,
-                 model='model', input='obs', eps=None, **kwargs):
+    def forward(self, batch, state=None,
+                model='model', input='obs', eps=None, **kwargs):
         """Compute action over the given batch data.
 
         :param float eps: in [0, 1], for epsilon-greedy exploration method.
@@ -106,8 +112,10 @@ class DQNPolicy(BasePolicy):
             * ``logits`` the network's raw output.
             * ``state`` the hidden state.
 
-        More information can be found at
-        :meth:`~tianshou.policy.BasePolicy.__call__`.
+        .. seealso::
+
+            Please refer to :meth:`~tianshou.policy.BasePolicy.forward` for
+            more detailed explanation.
         """
         model = getattr(self, model)
         obs = getattr(batch, input)
