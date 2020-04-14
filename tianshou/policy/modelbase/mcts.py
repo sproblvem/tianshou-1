@@ -2,7 +2,6 @@ import numpy as np
 import math
 import time
 
-c_puct = 0.01
 
 class MCTSNode(object):
     def __init__(self, parent, action, state, action_num, prior,
@@ -34,12 +33,11 @@ class UCTNode(MCTSNode):
         self.Q = np.random.uniform(0, 1, action_num) * (1e-6)
         self.W = np.zeros([action_num])
         self.N = np.zeros([action_num])
-        self.c_puct = c_puct
-        self.ucb = self.Q + self.c_puct * self.prior * math.sqrt(
-            np.sum(self.N)) / (self.N + 1)
         self.mask = None
         self.elapse_time = 0
         self.mcts = mcts
+        self.ucb = self.Q + self.mcts.cpuct * self.prior * math.sqrt(
+            np.sum(self.N)) / (self.N + 1)
 
     def selection(self, simulator):
         head = time.time()
@@ -64,12 +62,12 @@ class UCTNode(MCTSNode):
         for i in range(self.action_num):
             if self.N[i] != 0:
                 self.Q[i] = (self.W[i] + 0.) / self.N[i]
-        self.ucb = self.Q + c_puct * self.prior * math.sqrt(np.sum(self.N)) / (
-                    self.N + 1.)
+        self.ucb = self.Q + self.mcts.cpuct * self.prior * math.sqrt(
+            np.sum(self.N)) / (self.N + 1.)
         # print("\tnode {} UCB {}".format(self.state[0], self.ucb))
         # print("\tN {} W {} Q {}".format(self.N, self.W, self.Q))
         # print("\tU(s,a)  : {}".format(
-        #    c_puct * self.prior * math.sqrt(np.sum(self.N)) / (self.N + 1.)))
+        #    cpuct * self.prior * math.sqrt(np.sum(self.N)) / (self.N + 1.)))
         if self.parent is not None:
             if self.inverse:
                 self.parent.backpropagation(-self.children[action].reward)
@@ -122,12 +120,14 @@ class ActionNode(object):
             self.mcts.action_selection_time += time.time() - head
             return self
 
-    def expansion(self, prior, action_num):
+    def expansion(self, prior):
         # print("\t================ expansion state : ", self.next_state[0])
         self.children[self.next_state_hashvalue] = \
             UCTNode(self, self.action,
                     self.next_state,
-                    action_num, prior,
+                    self.mcts.simulator.get_valid_action_number(
+                        self.next_state),
+                    prior,
                     mcts=self.mcts,
                     inverse=self.parent.inverse)
 
@@ -137,29 +137,22 @@ class ActionNode(object):
 
 
 class MCTSPolicy(object):
-    def __init__(self, simulator, evaluator, start_state, action_num,
-                 method="UCT",
-                 role="unknown", debug=False, inverse=False, epsilon=0.25):
+    def __init__(self, simulator, evaluator, cpuct, max_step=None,
+                 max_time=None, role="unknown", debug=False, inverse=False,
+                 epsilon=0.25):
         self.simulator = simulator  # simulator is a class
         self.evaluator = evaluator  # evaluator is a callable function
         self.role = role
         self.debug = debug
         self.epsilon = epsilon
-        # the initialization of the evaluator will call simulate_step_forward
-        prior, _ = self.evaluator(start_state)
-        # prior = (1 - self.epsilon) * prior + self.epsilon *
-        # np.random.dirichlet(1.0/action_num * np.ones([action_num]))
-        prior = np.ones([action_num])
-        print("initial root prior : ", prior)
-        self.action_num = action_num
-        if method == "":
-            self.root = start_state
-        if method == "UCT":
-            self.root = UCTNode(None, None, start_state, action_num, prior,
-                                mcts=self, inverse=inverse)
         self.inverse = inverse
+        self.cpuct = cpuct
+        self.max_step = max_step
+        self.max_time = max_time
+        if max_step is None and max_time is None:
+            raise ValueError("Need a stop criteria!")
 
-        # time spend on each step
+        # profiling : the time spend on each step
         self.selection_time = 0
         self.expansion_time = 0
         self.backpropagation_time = 0
@@ -169,13 +162,21 @@ class MCTSPolicy(object):
         self.valid_mask_time = 0
         self.hash_time = 0
 
-    def search(self, max_step=None, max_time=None):
+    def forward(self, start_state):
+        # initialization for each call
+        # prior = (1 - self.epsilon) * prior + self.epsilon * \
+        #   np.random.dirichlet(1.0/action_num * np.ones([action_num]))
+        prior, _ = self.evaluator(start_state)
+        # print("initial root prior : ", prior)
+        self.root = UCTNode(None, None, start_state,
+                            self.simulator.
+                            get_valid_action_number(start_state),
+                            prior, mcts=self, inverse=self.inverse)
         step = 0
         start_time = time.time()
-        if max_step is None and max_time is None:
-            raise ValueError("Need a stop criteria!")
 
-        while step < max_step and time.time() - start_time < max_step:
+        while step < self.max_step and \
+                time.time() - start_time < self.max_time:
             # print("round : ", step)
             sel_time, exp_time, back_time = self._expand()
             self.selection_time += sel_time
@@ -204,6 +205,12 @@ class MCTSPolicy(object):
                        + "\n")
             file.close()
 
+    def process_fn(self):
+        return
+
+    def learn(self):
+        return
+
     def _expand(self):
         t0 = time.time()
         # 0. selection
@@ -216,7 +223,7 @@ class MCTSPolicy(object):
         if next_action.next_state is not None:
             # evaluator returns the policy and value for new expansion state
             policy, value = self.evaluator(next_action.next_state)
-            next_action.expansion(policy, self.action_num)
+            next_action.expansion(policy)
         else:
             # print("\t------- terminal node : ", next_action.parent.state[0])
             value = 0
@@ -228,6 +235,7 @@ class MCTSPolicy(object):
             next_action.backpropagation(value + 0.)
         t3 = time.time()
         return t1 - t0, t2 - t1, t3 - t2
+
 
 if __name__ == "__main__":
     pass

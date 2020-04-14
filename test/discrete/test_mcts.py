@@ -1,14 +1,26 @@
 import numpy as np
+import argparse
 from tianshou.policy import MCTSPolicy
 
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--max-step', type=int, default=100000)
+    parser.add_argument('--max-time', type=float, default=100.0)
+    parser.add_argument('--max-depth', type=int, default=2)
+    parser.add_argument('--cpuct', type=int, default=0.05)
+    args = parser.parse_known_args()[0]
+    return args
+
+
 class Evaluator(object):
-    def __init__(self, env, action_num):
+    def __init__(self, env):
         self.env = env
-        self.action_num = action_num
+        self.action_number = 2
         self.is_terminated = False
 
     def __call__(self, state):
-        return np.ones([self.action_num]), 0
+        return np.ones([self.action_number]), 0
         '''
         # TODO: prior for rollout policy
         total_reward = 0.
@@ -24,10 +36,11 @@ class Evaluator(object):
 
 
 class TestEnv:
-    def __init__(self, max_depth=5):
+    def __init__(self, max_depth=2):
+        self.action_number = 2
         self.max_depth = max_depth
-        self.leaf_node_number = 2 ** max_depth
-        self.half_leaf_node_num = 2 ** (max_depth - 1)
+        self.leaf_node_number = self.action_number ** max_depth
+        self.half_leaf_node_num = self.action_number ** (max_depth - 1)
         self.reward = \
             {i: np.random.uniform() for i in range(self.leaf_node_number)}
         self.max_reward = [0, 0]
@@ -37,9 +50,13 @@ class TestEnv:
                                      self.reward[self.half_leaf_node_num + i])
         # self.reward = {0:1, 1:0}
         self.best = max(self.reward.items(), key=lambda x: x[1])
-        print(self.reward)
-        # print("The best arm is {} with expected reward {}".
-        # format(self.best[0],self.best[1]))
+        print("The reward vector for all leaf nodes are : ")
+        for key in self.reward:
+            print("\t{} {:.6f}".format(key, self.reward[key]))
+        print("The max reward vec is {}".format(self.max_reward))
+
+    def get_valid_action_number(self, state):
+        return self.action_number
 
     def simulate_is_valid(self, state, act):
         return True
@@ -67,24 +84,33 @@ class TestEnv:
         return state[0]  # the number of the state
 
 
-if __name__ == "__main__":
-    env = TestEnv(max_depth=2)
+def test_mcts(args=get_args()):
+    env = TestEnv(max_depth=args.max_depth)
 
     def evaluator(state):
-        return Evaluator(env, 2)(state)
+        return Evaluator(env)(state)
 
+    mcts = MCTSPolicy(env, evaluator, cpuct=args.cpuct,
+                      max_step=args.max_step, max_time=args.max_time)
     root_number = 1
     root_depth = 0
     root_node = [root_number, root_depth]
-    mcts = MCTSPolicy(env, evaluator, root_node, action_num=2)
-    mcts.search(max_step=50000)
-    print("The root ucb is {}.\nThe max reward vec is {}".
-          format(mcts.root.ucb, env.max_reward))
-    if (np.argmax(mcts.root.ucb) == np.argmax(env.max_reward)):
+    print("MCTS will expand for {} times.".format(args.max_step))
+    mcts.forward(root_node)
+    print("On root node : \n"
+          "\tN is {}.\n"
+          "\tQ is {}.\n"
+          "\tucb {}.".
+          format(mcts.root.N, mcts.root.Q, mcts.root.ucb, env.max_reward))
+    if (np.argmax(mcts.root.Q) == np.argmax(env.max_reward)):
         print("MCTS find the right action successfully!")
     else:
         print("MCTS failed !!!, it select action {} on root node.\n".
               format(np.argmax(mcts.root.ucb)))
+
+
+if __name__ == "__main__":
+    test_mcts(get_args())
 
 '''
 failure examples

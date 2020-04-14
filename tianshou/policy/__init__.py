@@ -7,7 +7,7 @@ from tianshou.policy.modelfree.ddpg import DDPGPolicy
 from tianshou.policy.modelfree.ppo import PPOPolicy
 from tianshou.policy.modelfree.td3 import TD3Policy
 from tianshou.policy.modelfree.sac import SACPolicy
-from tianshou.policy.modelbase.mcts import MCTSPolicy 
+from tianshou.policy.modelbase.mcts import MCTSPolicy
 
 __all__ = [
     'BasePolicy',
