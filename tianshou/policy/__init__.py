@@ -1,4 +1,5 @@
 from tianshou.policy.base import BasePolicy
+from tianshou.policy.imitation import ImitationPolicy
 from tianshou.policy.modelfree.dqn import DQNPolicy
 from tianshou.policy.modelfree.pg import PGPolicy
 from tianshou.policy.modelfree.a2c import A2CPolicy
@@ -10,6 +11,7 @@ from tianshou.policy.modelbase.mcts import MCTSPolicy
 
 __all__ = [
     'BasePolicy',
+    'ImitationPolicy',
     'DQNPolicy',
     'PGPolicy',
     'A2CPolicy',
